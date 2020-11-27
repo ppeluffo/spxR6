@@ -65,7 +65,7 @@
 // DEFINES
 //------------------------------------------------------------------------------------
 //#define SPX_FW_REV "3.0.5c"
-#define SPX_FW_REV "TESTING 1.0"
+#define SPX_FW_REV "TESTING 1.1"
 #define SPX_FW_DATE "@ 20201123"
 
 #define SPX_HW_MODELO "spxR5 HW:xmega256A3B R1.1"

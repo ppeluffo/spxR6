@@ -61,15 +61,16 @@ t_comms_states tkComms_st_dataframe(void)
 void xDATA_FRAME_send(void)
 {
 
-uint8_t registros_trasmitidos = 0;
+//uint8_t registros_trasmitidos = 0;
 
 	// Envio un window frame
-	registros_trasmitidos = 0;
-	FF_rewind();
+//	registros_trasmitidos = 0;
+//	FF_rewind();
 
 	xCOMMS_flush_RX();
 	xCOMMS_flush_TX();
 
+/*
 	xCOMMS_send_header("DATA");
 	xprintf_PVD(  xCOMMS_get_fd(), DF_COMMS, PSTR("&PLOAD=\0") );
 
@@ -80,6 +81,9 @@ uint8_t registros_trasmitidos = 0;
 		vTaskDelay( (portTickType)( INTER_FRAMES_DELAY / portTICK_RATE_MS ) );
 	}
 
+	xCOMMS_send_tail();
+*/
+	xprintf_PVD( xCOMMS_get_fd(), DF_COMMS, PSTR("GET /cgi-bin/testComms.py?PRUEBAS_DE_COMUNICACIONES\0" ) );
 	xCOMMS_send_tail();
 
 }

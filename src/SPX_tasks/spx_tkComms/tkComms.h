@@ -18,7 +18,7 @@ typedef enum { NET_OPEN = 0, NET_CLOSE, NET_UNKNOWN } t_net_status;
 typedef enum { ATCMD_ENTRY = 0, ATCMD_TEST, ATCMD_CMD, ATCMD_WAIT, ATCMD_EXIT } atcmd_state_t;
 
 typedef enum { INIT_AUTH = 0, INIT_SRVUPDATE, INIT_GLOBAL, INIT_BASE, INIT_ANALOG, INIT_DIGITAL, INIT_COUNTERS, INIT_RANGE, INIT_PSENSOR, INIT_APP_A, INIT_APP_B, INIT_APP_C, INIT_MODBUS, DATA, SCAN } t_frame;
-typedef enum { frame_ENTRY = 0, frame_RESPONSE, frame_NET } t_frame_states;
+typedef enum { frame_ENTRY = 0, frame_RESPONSE, frame_NET, frame_LINK, frame_DATA, frame_EXIT } t_frame_states;
 typedef enum { rsp_OK = 0, rsp_ERROR, rsp_NONE } t_responses;
 
 #define MAX_TRIES_PWRON 		3	// Intentos de prender HW el modem
@@ -101,14 +101,14 @@ bool xCOMMS_scan_try ( PGM_P *dlist );
 
 void xCOMMS_mon_sqe( bool modo_continuo, uint8_t *csq );
 
-t_net_status xCOMMS_netopen(void);
-t_net_status xCOMMS_netclose(void);
-t_net_status xCOMMS_netstatus(void);
+//t_net_status xCOMMS_netopen(void);
+//t_net_status xCOMMS_netclose(void);
+//t_net_status xCOMMS_netstatus(void);
 bool xCOMMS_ipaddr( char *ip_assigned );
 
-t_link_status xCOMMS_linkopen( char *ip, char *port);
-t_link_status xCOMMS_linkclose( void );
-t_link_status xCOMMS_linkstatus( bool dcd_mode);
+//t_link_status xCOMMS_linkopen( char *ip, char *port);
+//t_link_status xCOMMS_linkclose( void );
+//t_link_status xCOMMS_linkstatus( bool dcd_mode);
 
 void xCOMMS_flush_RX(void);
 void xCOMMS_flush_TX(void);
@@ -154,7 +154,7 @@ void gprs_mon_sqe( bool forever, uint8_t *csq);
 
 t_net_status gprs_NETCLOSE( void );
 t_net_status  gprs_NETOPEN( void );
-t_net_status gprs_NET_status( void );
+t_net_status gprs_NETSTATUS( void );
 bool gprs_IPADDR( char *ip_assigned );
 
 t_link_status gprs_LINK_status(  bool dcd_mode );
@@ -176,5 +176,25 @@ void aux_flush_TX_buffer(void);
 void aux_print_RX_buffer( bool ascii_mode );
 char *aux_get_buffer( void );
 uint16_t aux_get_buffer_ptr( void );
+
+//------------------------------------------------------------------------------------
+// NEW COMMANDS
+//------------------------------------------------------------------------------------
+bool gprs_cmd_netstatus( t_net_status *net_status );
+bool gprs_cmd_netopen( void );
+bool gprs_cmd_netclose( void );
+
+bool xCOMMS_netstatus(t_net_status *net_status );
+bool xCOMMS_netopen( void );
+bool xCOMMS_netclose( void );
+
+bool gprs_cmd_linkopen( char *ip, char *port);
+bool gprs_cmd_linkclose( void );
+bool gprs_cmd_linkstatus( t_link_status *link_status );
+
+bool xCOMMS_linkopen( char *ip, char *port);
+bool xCOMMS_linkclose( void );
+bool xCOMMS_linkstatus( t_link_status *link_status );
+
 
 #endif /* SRC_SPX_TASKS_SPX_TKCOMMS_TKCOMMS_H_ */

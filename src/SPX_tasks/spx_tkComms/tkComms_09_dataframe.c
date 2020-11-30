@@ -17,6 +17,7 @@ static st_dataRecord_t dataRecord;
 static void data_send_record( void );
 static uint8_t data_process_response_OK(void);
 
+static char txbuffer[128];
 
 //------------------------------------------------------------------------------------
 t_comms_states tkComms_st_dataframe(void)
@@ -28,17 +29,7 @@ t_comms_states tkComms_st_dataframe(void)
 
 // ENTRY
 
-#ifdef BETA_TEST
-	xprintf_PD( DF_COMMS, PSTR("COMMS: IN st_dataframe.[%d,%d,%d]\r\n\0"),xCOMMS_stateVars.gprs_prendido, xCOMMS_stateVars.gprs_inicializado,xCOMMS_stateVars.errores_comms);
-#else
 	xprintf_PD( DF_COMMS, PSTR("COMMS: IN st_dataframe.\r\n"));
-#endif
-
-#ifdef MONITOR_STACK
-	debug_monitor_stack_watermarks("13");
-#endif
-
-	xprintf_P( PSTR("COMMS: dataframe.\r\n\0"));
 	ctl_watchdog_kick(WDG_COMMS, WDG_COMMS_TO_DATAFRAME );
 
 	while ( xCOMMS_datos_para_transmitir() > 0 ) {
@@ -48,12 +39,7 @@ t_comms_states tkComms_st_dataframe(void)
 	// Si llego la senal, la reseteo ya que transmiti todos los frames.
 	xCOMMS_SGN_FRAME_READY();
 
-#ifdef BETA_TEST
-	xprintf_PD( DF_COMMS, PSTR("COMMS: OUT st_dataframe.[%d,%d,%d]\r\n\0"),xCOMMS_stateVars.gprs_prendido, xCOMMS_stateVars.gprs_inicializado,xCOMMS_stateVars.errores_comms);
-#else
 	xprintf_PD( DF_COMMS, PSTR("COMMS: OUT st_dataframe.\r\n\0"));
-#endif
-
 	return(ST_ESPERA_PRENDIDO);
 
 }
@@ -62,6 +48,7 @@ void xDATA_FRAME_send(void)
 {
 
 //uint8_t registros_trasmitidos = 0;
+uint8_t size;
 
 	// Envio un window frame
 //	registros_trasmitidos = 0;
@@ -83,8 +70,33 @@ void xDATA_FRAME_send(void)
 
 	xCOMMS_send_tail();
 */
-	xprintf_PVD( xCOMMS_get_fd(), DF_COMMS, PSTR("GET /cgi-bin/testComms.py?PRUEBAS_DE_COMUNICACIONES\0" ) );
-	xCOMMS_send_tail();
+	strcpy(txbuffer,"GET /cgi-bin/testComms.py?PRUEBAS_DE_COMUNICACIONES\0");
+	size=sizeof(txbuffer);
+	xprintf_P(PSTR("tx[%d]\r\n"), size);
+	gprs_flush_RX_buffer();
+	gprs_flush_TX_buffer();
+	xfprintf_P( fdGPRS , PSTR("AT+TCPWRITE=%d\r"), size ) ;
+	vTaskDelay( (portTickType)( 100 / portTICK_RATE_MS ) );
+	gprs_print_RX_buffer();
+	xfprintf( fdGPRS , txbuffer) ;
+	vTaskDelay( (portTickType)( 500 / portTICK_RATE_MS ) );
+	gprs_print_RX_buffer();
+
+	strcpy(txbuffer," HTTP/1.1\r\nHost: www.spymovil.com\r\n\r\n\r\n\0");
+	size=sizeof(txbuffer);
+	xprintf_P(PSTR("tx[%d]\r\n"), size);
+	gprs_flush_RX_buffer();
+	gprs_flush_TX_buffer();
+	xfprintf_P( fdGPRS , PSTR("AT+TCPWRITE=%d\r"), size ) ;
+	vTaskDelay( (portTickType)( 100 / portTICK_RATE_MS ) );
+	gprs_print_RX_buffer();
+	xfprintf( fdGPRS , txbuffer) ;
+	vTaskDelay( (portTickType)( 500 / portTICK_RATE_MS ) );
+	gprs_print_RX_buffer();
+
+
+	//xprintf_PVD( xCOMMS_get_fd(), DF_COMMS, PSTR("GET /cgi-bin/testComms.py?PRUEBAS_DE_COMUNICACIONES\0" ) );
+	//xCOMMS_send_tail();
 
 }
 //------------------------------------------------------------------------------------

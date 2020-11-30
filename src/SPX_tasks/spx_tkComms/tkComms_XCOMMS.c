@@ -289,10 +289,12 @@ char ip_tmp[IP_LENGTH];
 	}
 }
 //------------------------------------------------------------------------------------
+/*
 t_net_status xCOMMS_netopen( void )
 {
 	return( gprs_NETOPEN());
 }
+*/
 //------------------------------------------------------------------------------------
 bool xCOMMS_ipaddr( char *ip_assigned )
 {
@@ -300,15 +302,19 @@ bool xCOMMS_ipaddr( char *ip_assigned )
 	return( gprs_IPADDR( ip_assigned ) == false );
 }
 //------------------------------------------------------------------------------------
+/*
 t_net_status  xCOMMS_netclose( void )
 {
 	return(gprs_NETCLOSE());
 }
+*/
 //------------------------------------------------------------------------------------
+/*
 t_net_status  xCOMMS_netstatus( void )
 {
-	return(gprs_NET_status());
+	return(gprs_NETSTATUS());
 }
+*/
 //------------------------------------------------------------------------------------
 t_link_status xCOMMS_linkopen( char *ip, char *port)
 {
@@ -453,7 +459,7 @@ bool xCOMMS_SGN_REDIAL(void)
 	return (false);
 }
 //------------------------------------------------------------------------------------
-bool xCOMMS_process_frame (t_frame tipo_frame, char *dst_ip, char *dst_port )
+bool xCOMMS_process_frame__ (t_frame tipo_frame, char *dst_ip, char *dst_port )
 {
 	/*
 	 * Esta el la funcion que hace el trabajo de mandar un frame , esperar
@@ -463,38 +469,24 @@ bool xCOMMS_process_frame (t_frame tipo_frame, char *dst_ip, char *dst_port )
 t_frame_states fr_state = frame_ENTRY;
 t_link_status link_status;
 t_net_status net_status;
-int8_t tryes;
 int8_t timeout = 10 ;
 t_responses frame_response = rsp_NONE;
 bool retS = false;
 
-#ifdef BETA_TEST
-	xprintf_PD( DF_COMMS, PSTR("COMMS: IN  pf_fsm (type=%d).\r\n\0"),tipo_frame );
-#endif
-
-	// Ajusto los intentos en SCAN ya que sino repito los errores.
-	if ( tipo_frame == SCAN ) {
-		tryes = 4;
-	} else {
-		tryes = 9;
-	}
+	xprintf_P( PSTR("COMMS: xCOMMS_process_frame\r\n" ));
 
 	while (1) {
 
 		switch(fr_state) {
 
 		case frame_ENTRY:
+			net_status =
 #ifdef BETA_TEST
 			xprintf_P( PSTR("COMMS: pf_fsm ENTRY(tryes=%d).\r\n\0" ), tryes );
 #endif
-			// Maximo esfuerzo. Salgo.
-			if ( tryes-- <= 0 ) {
-				retS = false;
-				goto EXIT;
-			}
 
 			// Veo si el socket esta abierto( por dcd).
-			link_status = xCOMMS_linkstatus(true );
+			link_status = xCOMMS_linkstatus( false );
 
 			// Enlace TCP abierto ( socket )
 			if ( link_status == LINK_OPEN ) {
@@ -526,7 +518,7 @@ bool retS = false;
 			gprs_switch_to_command_mode(true);
 
 			// Veo si el servicio de sockets esta abierto.
-			net_status = xCOMMS_netstatus();
+//			net_status = xCOMMS_netstatus();
 
 			// NET open: Intento abrir el link.
 			if ( net_status == NET_OPEN ) {
@@ -645,4 +637,347 @@ EXIT:
 	return(retS);
 }
 //------------------------------------------------------------------------------------
+bool xCOMMS_process_frame (t_frame tipo_frame, char *dst_ip, char *dst_port )
+{
+	/*
+	 * Esta el la funcion que hace el trabajo de mandar un frame , esperar
+	 * la respuesta y procesarla.
+	 */
 
+t_frame_states fr_state = frame_NET;
+t_link_status link_status;
+t_net_status net_status;
+bool retS = false;
+int8_t net_tryes = 4;
+int8_t link_tryes = 4;
+
+	xprintf_P( PSTR("COMMS: xCOMMS_process_frame\r\n" ));
+
+	while (1) {
+
+		switch(fr_state) {
+
+		// NET LAYER
+		case frame_NET:
+//			net_status = gprs_cmd_netstatus();
+			if ( net_tryes-- <= 0 ) {
+				xprintf_PD( DF_COMMS, PSTR("COMMS: xCOMMS_process_frame: NET OPEN TO.!!!\r\n\0") );
+				return(false);
+			}
+			if ( net_status == NET_OPEN ) {
+				// El servicio de sockets esta abierto
+				xprintf_PD( DF_COMMS, PSTR("COMMS: xCOMMS_process_frame: NET OPEN.\r\n\0") );
+				xCOMMS_ipaddr( xCOMMS_stateVars.ip_assigned );
+				fr_state = frame_LINK;
+				break;
+			}
+			if ( net_status == NET_CLOSE) {
+				// Inicio y espero respuesta
+				xprintf_PD( DF_COMMS, PSTR("COMMS: xCOMMS_process_frame: NET CLOSE.\r\n\0") );
+				if ( ! gprs_cmd_netopen() ) {
+					xprintf_PD( DF_COMMS, PSTR("COMMS: xCOMMS_process_frame: NET: gprs cmd not respond !!.\r\n\0") );
+					return(false);
+				}
+				break;
+			}
+			if ( net_status == NET_UNKNOWN ) {
+				// Error
+				xprintf_PD( DF_COMMS, PSTR("COMMS: xCOMMS_process_frame: NET UNKNOWN.\r\n\0") );
+				if ( ! gprs_cmd_netclose() ) {
+					xprintf_PD( DF_COMMS, PSTR("COMMS: xCOMMS_process_frame: NET gprs cmd not respond !!.\r\n\0") );
+					return(false);
+				}
+				vTaskDelay( (portTickType)( 5000 / portTICK_RATE_MS ) );
+				break;
+			}
+
+			break;
+
+		// LINK LAYER
+		case frame_LINK:
+	//		link_status = gprs_cmd_linkstatus();
+			if ( link_tryes-- <= 0 ) {
+				xprintf_PD( DF_COMMS, PSTR("COMMS: xCOMMS_process_frame: LINK OPEN TO.!!!\r\n\0") );
+				return(false);
+			}
+			if ( link_status == LINK_OPEN ) {
+				// El socket esta abierto.
+				xprintf_PD( DF_COMMS, PSTR("COMMS: xCOMMS_process_frame: LINK OPEN.\r\n\0") );
+				fr_state = frame_DATA;
+				break;
+			}
+			if ( link_status == LINK_CLOSE ) {
+				// Intento abrir el socket
+				xprintf_PD( DF_COMMS, PSTR("COMMS: xCOMMS_process_frame: LINK CLOSE.\r\n\0") );
+				if ( ! gprs_cmd_linkopen(dst_ip, dst_port) ) {
+					xprintf_PD( DF_COMMS, PSTR("COMMS: xCOMMS_process_frame: LINK gprs cmd not respond !!.\r\n\0") );
+				}
+				break;
+			}
+			if ( link_status == LINK_UNKNOWN ) {
+				// Error
+				xprintf_PD( DF_COMMS, PSTR("COMMS: xCOMMS_process_frame: LINK UNKNOWN.\r\n\0") );
+				if ( ! gprs_cmd_linkclose() ) {
+					xprintf_PD( DF_COMMS, PSTR("COMMS: xCOMMS_process_frame: LINK gprs cmd not respond !!.\r\n\0") );
+				}
+				vTaskDelay( (portTickType)( 5000 / portTICK_RATE_MS ) );
+				break;
+			}
+			break;
+
+		case frame_DATA:
+			xprintf_PD( DF_COMMS, PSTR("COMMS: xCOMMS_process_frame: DATA.\r\n\0") );
+			vTaskDelay( (portTickType)( 5000 / portTICK_RATE_MS ) );
+//			xCOMMS_linkclose2();
+//			xCOMMS_netclose2();
+			return(true);
+
+
+		default:
+			xprintf_P( PSTR("COMMS: pf_fsm ERROR not known !!!\r\n\0" ) );
+			xprintf_PD( DF_COMMS, PSTR("COMMS: pf_fsm type %d failed. State error !!!\r\n\0"),tipo_frame );
+			retS = false;
+			goto EXIT;
+		}
+	}
+
+EXIT:
+
+	return(retS);
+}
+//------------------------------------------------------------------------------------
+/*
+ * Los comandos de xCOMMS son solo wrappers de los comandos de gprs de modo que al
+ * implementar las maquinas de estado es este nivel podamos abstraernos de la
+ * tecnologia de comunicaciones que implementemos ( gprs, xbee, lora, etc )
+ */
+// NET COMMANDS R2
+//------------------------------------------------------------------------------------
+bool xCOMMS_netopen(void)
+{
+	return( gprs_cmd_netopen() );
+}
+//------------------------------------------------------------------------------------
+bool xCOMMS_netclose(void)
+{
+	return( gprs_cmd_netclose() );
+}
+//------------------------------------------------------------------------------------
+bool xCOMMS_netstatus( t_net_status *net_status )
+{
+	return( gprs_cmd_netstatus(net_status) );
+}
+//------------------------------------------------------------------------------------
+bool xCOMMS_linkopen( char *ip, char *port)
+{
+	return( gprs_linkopen(ip, port));
+}
+//------------------------------------------------------------------------------------
+bool xCOMMS_linkclose( void )
+{
+	return( gprs_cmd_linkclose());
+}
+//------------------------------------------------------------------------------------
+bool xCOMMS_linkstatus( t_link_status *link_status )
+{
+	return( gprs_linkstatus( link_status));
+}
+//------------------------------------------------------------------------------------
+
+bool xCOMMS_netopen2( void )
+{
+	/*
+	 * Implemento una FSM que intenta iniciar el servicio de socket y obtener una ip.
+	 * Puede demorar algunos segundos ( hasta 120 )
+	 *
+	 */
+
+/*
+t_net_status net_status;
+int8_t tryes = 3;
+bool retS = false;
+
+
+	while(tryes-- > 0 ) {
+		net_status = gprs_cmd_netstatus();
+		switch( net_status ) {
+		case NET_OPEN:
+			xprintf_PD( DF_COMMS, PSTR("COMMS: xCOMMS_netopen open.\r\n\0") );
+			xCOMMS_ipaddr( xCOMMS_stateVars.ip_assigned );
+			retS = true;
+			goto EXIT;
+			break;
+		case NET_CLOSE:
+			// Inicio y espero respuesta
+			xprintf_PD( DF_COMMS, PSTR("COMMS: xCOMMS_netopen CLOSE.\r\n\0") );
+			if ( ! gprs_cmd_netopen() ) {
+				xprintf_PD( DF_COMMS, PSTR("COMMS: xCOMMS_netopen gprs cmd not respond !!.\r\n\0") );
+			}
+			break;
+		case NET_UNKNOWN:
+			// Error
+			xprintf_PD( DF_COMMS, PSTR("COMMS: xCOMMS_netopen unknown.\r\n\0") );
+			if ( ! gprs_cmd_netclose() ) {
+				xprintf_PD( DF_COMMS, PSTR("COMMS: xCOMMS_netopen gprs cmd not respond !!.\r\n\0") );
+			}
+			vTaskDelay( (portTickType)( 5000 / portTICK_RATE_MS ) );
+			break;
+		}
+	}
+
+	// Sali por UNKNOWN o TIMEOUT:
+
+EXIT:
+
+	return(retS);
+ */
+	return(true);
+
+}
+//------------------------------------------------------------------------------------
+bool xCOMMS_netclose2( void )
+{
+	/*
+	 * Implemento una FSM que intenta cerrar el servicio de socket y obtener una ip.
+	 * Puede demorar algunos segundos ( hasta 120 )
+	 *
+	 */
+
+/*
+t_net_status net_status;
+int8_t tryes = 3;
+bool retS = false;
+
+	while(tryes-- > 0 ) {
+		net_status = gprs_cmd_netstatus();
+		switch( net_status ) {
+		case NET_CLOSE:
+			xprintf_PD( DF_COMMS, PSTR("COMMS: xCOMMS_netclose close.\r\n\0") );
+			retS = true;
+			goto EXIT;
+			break;
+		case NET_OPEN:
+			xprintf_PD( DF_COMMS, PSTR("COMMS: xCOMMS_netclose open.\r\n\0") );
+			if ( ! gprs_cmd_netclose() ) {
+				xprintf_PD( DF_COMMS, PSTR("COMMS: xCOMMS_netclose gprs cmd not respond !!.\r\n\0") );
+			}
+			vTaskDelay( (portTickType)( 2000 / portTICK_RATE_MS ) );
+			break;
+		case NET_UNKNOWN:
+			// Error
+			xprintf_PD( DF_COMMS, PSTR("COMMS: xCOMMS_netclose unknown.\r\n\0") );
+			if ( ! gprs_cmd_netclose() ) {
+				xprintf_PD( DF_COMMS, PSTR("COMMS: xCOMMS_netclose gprs cmd not respond !!.\r\n\0") );
+			}
+			vTaskDelay( (portTickType)( 2000 / portTICK_RATE_MS ) );
+			break;
+		}
+	}
+
+	// Sali por UNKNOWN:
+
+EXIT:
+
+	return(retS);
+*/
+	return(true);
+}
+//------------------------------------------------------------------------------------
+/*
+t_net_status xCOMMS_netstatus2( void )
+{
+
+	return( gprs_cmd_netstatus());
+}
+*/
+//------------------------------------------------------------------------------------
+// LINK COMMANDS R2
+//------------------------------------------------------------------------------------
+/*
+bool xCOMMS_linkopen2( char *ip, char *port)
+{
+
+t_link_status link_status;
+int8_t tryes = 3;
+bool retS = false;
+
+	while(tryes-- > 0 ) {
+		link_status = gprs_cmd_linkstatus();
+		switch( link_status ) {
+		case LINK_OPEN:
+			xprintf_PD( DF_COMMS, PSTR("COMMS: xCOMMS_linkopen open.\r\n\0") );
+			retS = true;
+			goto EXIT;
+			break;
+		case LINK_CLOSE:
+			// Inicio y espero respuesta
+			xprintf_PD( DF_COMMS, PSTR("COMMS: xCOMMS_linkopen close.\r\n\0") );
+			if ( ! gprs_cmd_linkopen(ip, port) ) {
+				xprintf_PD( DF_COMMS, PSTR("COMMS: xCOMMS_linkopen gprs cmd not respond !!.\r\n\0") );
+			}
+			break;
+		case LINK_UNKNOWN:
+			// Error
+			xprintf_PD( DF_COMMS, PSTR("COMMS: xCOMMS_linkopen unknown.\r\n\0") );
+			if ( ! gprs_cmd_linkclose() ) {
+				xprintf_PD( DF_COMMS, PSTR("COMMS: xCOMMS_linkopen gprs cmd not respond !!.\r\n\0") );
+			}
+			vTaskDelay( (portTickType)( 5000 / portTICK_RATE_MS ) );
+			break;
+		}
+	}
+
+	// Sali por UNKNOWN o TIMEOUT:
+
+EXIT:
+	return(retS);
+	// Intenta abrir el link hacia el servidor
+
+}
+//------------------------------------------------------------------------------------
+bool xCOMMS_linkclose2( void )
+{
+
+t_link_status link_status;
+int8_t tryes = 3;
+bool retS = false;
+
+	while(tryes-- > 0 ) {
+		link_status = gprs_cmd_linkstatus();
+		switch( link_status ) {
+		case LINK_CLOSE:
+			xprintf_PD( DF_COMMS, PSTR("COMMS: xCOMMS_linkclose close.\r\n\0") );
+			retS = true;
+			goto EXIT;
+			break;
+		case LINK_OPEN:
+			xprintf_PD( DF_COMMS, PSTR("COMMS: xCOMMS_linkclose open.\r\n\0") );
+			if ( ! gprs_cmd_linkclose() ) {
+				xprintf_PD( DF_COMMS, PSTR("COMMS: xCOMMS_linkclose gprs cmd not respond !!.\r\n\0") );
+			}
+			vTaskDelay( (portTickType)( 2000 / portTICK_RATE_MS ) );
+			break;
+		case NET_UNKNOWN:
+			// Error
+			xprintf_PD( DF_COMMS, PSTR("COMMS: xCOMMS_linkclose unknown.\r\n\0") );
+			if ( ! gprs_cmd_linkclose() ) {
+				xprintf_PD( DF_COMMS, PSTR("COMMS: xCOMMS_linkclose gprs cmd not respond !!.\r\n\0") );
+			}
+			vTaskDelay( (portTickType)( 2000 / portTICK_RATE_MS ) );
+			break;
+		}
+	}
+
+	// Sali por UNKNOWN:
+
+EXIT:
+	return(retS);
+}
+//------------------------------------------------------------------------------------
+t_link_status xCOMMS_linkstatus2( void )
+{
+	return( gprs_cmd_linkstatus());
+}
+//------------------------------------------------------------------------------------
+*/
+ */
